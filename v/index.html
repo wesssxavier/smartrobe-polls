@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Which one? · Smartrobe</title>
+<meta name="description" content="Help pick an outfit. Vote in one tap, no app needed.">
+<meta property="og:title" content="Which one should I wear?">
+<meta property="og:description" content="Help pick an outfit. Vote in one tap, no app needed.">
+<meta property="og:image" content="https://p.smartrobe.com/og.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#FAF9F6">
+<link rel="icon" href="/icon.png">
+<style>
+  :root { --bg:#FAF9F6; --ink:#252723; --muted:#6B6B66; --line:#E6E4DE; --tile:#FFFFFF; --accent:#252723; --soft:#EFEEE9; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1B1C19; --ink:#FAF9F6; --muted:#A9A8A2; --line:#33352F; --tile:#F4F3EF; --accent:#FAF9F6; --soft:#2A2C27; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  main { max-width:560px; margin:0 auto; padding:calc(20px + env(safe-area-inset-top)) 20px calc(40px + env(safe-area-inset-bottom)); }
+  .brand { display:flex; align-items:center; gap:8px; font-weight:600; letter-spacing:-.3px; font-size:18px; color:var(--ink); text-decoration:none; }
+  .asker { margin:28px 0 4px; color:var(--muted); font-size:14px; text-transform:uppercase; letter-spacing:1.2px; font-weight:600; }
+  h1 { font-family:Georgia,"Times New Roman",serif; font-weight:700; font-size:30px; line-height:1.15; letter-spacing:-.5px; margin:0 0 20px; }
+  .options { display:grid; gap:14px; }
+  .option { border:1px solid var(--line); border-radius:16px; padding:12px; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; width:100%; position:relative; overflow:hidden; }
+  .option[aria-pressed="true"] { border:2px solid var(--accent); padding:11px; }
+  .option:disabled { cursor:default; }
+  .pieces { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .pieces.n4,.pieces.n2 { grid-template-columns:repeat(2,1fr); }
+  .pieces img { width:100%; aspect-ratio:3/4; object-fit:contain; background:var(--tile); border-radius:10px; padding:6px; }
+  .meta { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; }
+  .label { font-weight:600; }
+  .pick { font-size:14px; font-weight:600; padding:8px 14px; border-radius:999px; background:var(--accent); color:var(--bg); white-space:nowrap; }
+  .bar { height:6px; border-radius:3px; background:var(--soft); margin-top:10px; overflow:hidden; }
+  .bar span { display:block; height:100%; background:var(--accent); width:0; transition:width .5s ease; }
+  .pct { font-variant-numeric:tabular-nums; font-weight:600; }
+  .note { color:var(--muted); font-size:14px; margin:14px 0 0; min-height:20px; }
+  .cta { margin-top:32px; border-top:1px solid var(--line); padding-top:22px; }
+  .cta p { margin:0 0 12px; color:var(--muted); }
+  .cta a { display:inline-block; padding:12px 18px; border-radius:12px; background:var(--accent); color:var(--bg); text-decoration:none; font-weight:600; }
+  .empty { margin-top:60px; text-align:center; color:var(--muted); }
+  @media (prefers-reduced-motion: reduce) { .bar span { transition:none; } }
+</style>
+</head>
+<body>
+<main>
+  <a class="brand" href="https://smartrobe.com" aria-label="Smartrobe">
+    <svg width="26" height="26" viewBox="0 0 100 100" aria-hidden="true"><path d="M64 23 C59 13 44 11 36 20 C27 30 31 41 43 48 L80 69 C90 75 86 87 75 87 H23 C12 87 8 75 18 69 L32 61" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    smartrobe
+  </a>
+  <div id="app" aria-live="polite"></div>
+  <div class="cta">
+    <p id="ctaText"></p>
+    <a id="ctaLink" href="https://apps.apple.com/app/id6758676218"></a>
+  </div>
+</main>
+<script>
+(function () {
+  var SUPABASE_URL = 'https://mfzmlpzyrrectpuxhddg.supabase.co';
+  var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mem1scHp5cnJlY3RwdXhoZGRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyODA1MTEsImV4cCI6MjA4Njg1NjUxMX0.8Ld948uswz2vlF-YYyfME8t8oHhcu4c9wnk_of0Ck4A';
+
+  var STRINGS = {
+    en: { asks: '{name} asks', someone: 'A friend asks', pick: 'This one', voted: 'Your vote', thanks: 'Thanks! You can change your vote while the poll is open.', votes: '{n} votes', vote1: '1 vote', closed: 'This poll is closed. Final results:', missing: 'This poll doesn’t exist or was deleted.', error: 'Something went wrong. Please try again.', cta: 'Plan outfits from your own wardrobe.', get: 'Get Smartrobe', look: 'Look {n}' },
+    es: { asks: '{name} pregunta', someone: 'Una persona pregunta', pick: 'Este', voted: 'Tu voto', thanks: '¡Gracias! Puedes cambiar tu voto mientras la encuesta esté abierta.', votes: '{n} votos', vote1: '1 voto', closed: 'La encuesta ha terminado. Resultado final:', missing: 'Esta encuesta no existe o se ha eliminado.', error: 'Algo salió mal. Inténtalo de nuevo.', cta: 'Planifica tus looks con tu propio armario.', get: 'Descargar Smartrobe', look: 'Look {n}' },
+    'pt-BR': { asks: '{name} pergunta', someone: 'Uma pessoa pergunta', pick: 'Este', voted: 'Seu voto', thanks: 'Obrigado! Você pode mudar seu voto enquanto a enquete estiver aberta.', votes: '{n} votos', vote1: '1 voto', closed: 'A enquete terminou. Resultado final:', missing: 'Esta enquete não existe ou foi apagada.', error: 'Algo deu errado. Tente novamente.', cta: 'Monte looks com o seu próprio guarda-roupa.', get: 'Baixar o Smartrobe', look: 'Look {n}' },
+    'pt-PT': { asks: '{name} pergunta', someone: 'Alguém pergunta', pick: 'Este', voted: 'O teu voto', thanks: 'Obrigado! Podes mudar o teu voto enquanto a votação estiver aberta.', votes: '{n} votos', vote1: '1 voto', closed: 'A votação terminou. Resultado final:', missing: 'Esta votação não existe ou foi apagada.', error: 'Algo correu mal. Tenta novamente.', cta: 'Planeia conjuntos com o teu próprio roupeiro.', get: 'Descarregar o Smartrobe', look: 'Conjunto {n}' },
+    fr: { asks: '{name} demande', someone: 'Quelqu’un demande', pick: 'Celle-ci', voted: 'Votre vote', thanks: 'Merci ! Vous pouvez changer votre vote tant que le sondage est ouvert.', votes: '{n} votes', vote1: '1 vote', closed: 'Le sondage est terminé. Résultat final :', missing: 'Ce sondage n’existe pas ou a été supprimé.', error: 'Une erreur est survenue. Veuillez réessayer.', cta: 'Composez vos tenues avec votre propre dressing.', get: 'Télécharger Smartrobe', look: 'Tenue {n}' }
+  };
+  var lang = (navigator.language || 'en').toLowerCase();
+  var L = lang.indexOf('pt-br') === 0 ? 'pt-BR' : lang.indexOf('pt') === 0 ? 'pt-PT' : lang.indexOf('es') === 0 ? 'es' : lang.indexOf('fr') === 0 ? 'fr' : 'en';
+  var T = STRINGS[L];
+  document.documentElement.lang = L;
+  var fmt = function (s, v) { return s.replace(/\{(\w+)\}/g, function (_, k) { return v[k]; }); };
+  document.getElementById('ctaText').textContent = T.cta;
+  document.getElementById('ctaLink').textContent = T.get;
+
+  var slug = (new URLSearchParams(location.search).get('id') || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20);
+  var voter;
+  try { voter = localStorage.getItem('smartrobe.voter'); } catch (e) {}
+  if (!voter) {
+    voter = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+    try { localStorage.setItem('smartrobe.voter', voter); } catch (e) {}
+  }
+  var myVote = null;
+  try { myVote = localStorage.getItem('smartrobe.vote.' + slug); } catch (e) {}
+
+  var app = document.getElementById('app');
+  var esc = function (s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+  var rpc = function (fn, body) {
+    return fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+      method: 'POST',
+      headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+  };
+
+  var render = function (poll, note) {
+    if (!poll) { app.innerHTML = '<p class="empty">' + esc(T.missing) + '</p>'; return; }
+    var total = poll.total || 0;
+    var showResults = !!myVote || poll.closed;
+    var html = '<p class="asker">' + esc(poll.asker ? fmt(T.asks, { name: poll.asker }) : T.someone) + '</p>';
+    html += '<h1>' + esc(poll.question) + '</h1>';
+    if (poll.closed) html += '<p class="note">' + esc(T.closed) + '</p>';
+    html += '<div class="options">';
+    (poll.options || []).forEach(function (o, i) {
+      var n = (poll.counts && poll.counts[o.key]) || 0;
+      var pct = total ? Math.round(n * 100 / total) : 0;
+      var imgs = (o.images || []).slice(0, 4);
+      var mine = myVote === o.key;
+      html += '<button class="option" data-key="' + esc(o.key) + '" aria-pressed="' + (mine ? 'true' : 'false') + '"' + (poll.closed ? ' disabled' : '') + '>';
+      html += '<div class="pieces n' + imgs.length + '">' + imgs.map(function (src) { return '<img src="' + esc(src) + '" alt="" loading="lazy">'; }).join('') + '</div>';
+      html += '<div class="meta"><span class="label">' + esc(o.label || fmt(T.look, { n: i + 1 })) + '</span>';
+      html += showResults ? '<span class="pct">' + pct + '%</span>' : '<span class="pick">' + esc(T.pick) + '</span>';
+      html += '</div>';
+      if (showResults) html += '<div class="bar" aria-hidden="true"><span style="width:' + pct + '%"></span></div>';
+      html += '</button>';
+    });
+    html += '</div>';
+    html += '<p class="note">' + esc(note || (showResults ? (total === 1 ? T.vote1 : fmt(T.votes, { n: total })) : '')) + '</p>';
+    app.innerHTML = html;
+    Array.prototype.forEach.call(app.querySelectorAll('.option:not([disabled])'), function (btn) {
+      btn.addEventListener('click', function () { vote(btn.getAttribute('data-key')); });
+    });
+  };
+
+  var current = null;
+  var vote = function (key) {
+    myVote = key;
+    try { localStorage.setItem('smartrobe.vote.' + slug, key); } catch (e) {}
+    rpc('vote_poll', { p_slug: slug, p_option: key, p_voter: voter })
+      .then(function (poll) { current = poll; render(poll, T.thanks); })
+      .catch(function () { render(current, T.error); });
+  };
+
+  if (!slug) { render(null); return; }
+  rpc('get_poll', { p_slug: slug })
+    .then(function (poll) { current = poll; render(poll); })
+    .catch(function () { app.innerHTML = '<p class="empty">' + esc(T.error) + '</p>'; });
+})();
+</script>
+</body>
+</html>
