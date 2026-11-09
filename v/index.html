@@ -28,6 +28,15 @@
   .pieces { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
   .pieces.n4,.pieces.n2 { grid-template-columns:repeat(2,1fr); }
   .pieces img { width:100%; aspect-ratio:3/4; object-fit:contain; background:var(--tile); border-radius:10px; padding:6px; }
+  /* "Me wearing it": the asker's avatar in each look, side by side to compare at a glance. */
+  .options.worn { grid-template-columns:repeat(2,1fr); gap:10px; }
+  .options.worn.n3 { grid-template-columns:repeat(3,1fr); }
+  .options.worn .option { padding:6px; }
+  .options.worn .option[aria-pressed="true"] { padding:5px; }
+  .options.worn .meta { flex-direction:column; align-items:stretch; gap:6px; margin-top:8px; }
+  .options.worn .label { font-size:14px; padding:0 4px; }
+  .options.worn .pick { text-align:center; }
+  .worn-photo { width:100%; aspect-ratio:3/4; object-fit:cover; display:block; border-radius:11px; background:var(--tile); }
   .meta { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; }
   .label { font-weight:600; }
   .pick { font-size:14px; font-weight:600; padding:8px 14px; border-radius:999px; background:var(--accent); color:var(--bg); white-space:nowrap; }
@@ -57,6 +66,7 @@
 <script>
 (function () {
   var SUPABASE_URL = 'https://mfzmlpzyrrectpuxhddg.supabase.co';
+  var STORAGE = SUPABASE_URL + '/storage/v1/object/public/';
   var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mem1scHp5cnJlY3RwdXhoZGRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyODA1MTEsImV4cCI6MjA4Njg1NjUxMX0.8Ld948uswz2vlF-YYyfME8t8oHhcu4c9wnk_of0Ck4A';
 
   var STRINGS = {
@@ -101,14 +111,19 @@
     var html = '<p class="asker">' + esc(poll.asker ? fmt(T.asks, { name: poll.asker }) : T.someone) + '</p>';
     html += '<h1>' + esc(poll.question) + '</h1>';
     if (poll.closed) html += '<p class="note">' + esc(T.closed) + '</p>';
-    html += '<div class="options">';
-    (poll.options || []).forEach(function (o, i) {
+    // Only pictures from Smartrobe's own storage are shown.
+    var ours = function (src) { return typeof src === 'string' && src.indexOf(STORAGE) === 0; };
+    var opts = poll.options || [];
+    var worn = opts.length > 1 && opts.every(function (o) { return ours(o.photo); });
+    html += '<div class="options' + (worn ? ' worn n' + opts.length : '') + '">';
+    opts.forEach(function (o, i) {
       var n = (poll.counts && poll.counts[o.key]) || 0;
       var pct = total ? Math.round(n * 100 / total) : 0;
       var imgs = (o.images || []).slice(0, 4);
       var mine = myVote === o.key;
       html += '<button class="option" data-key="' + esc(o.key) + '" aria-pressed="' + (mine ? 'true' : 'false') + '"' + (poll.closed ? ' disabled' : '') + '>';
-      html += '<div class="pieces n' + imgs.length + '">' + imgs.map(function (src) { return '<img src="' + esc(src) + '" alt="" loading="lazy">'; }).join('') + '</div>';
+      if (worn) html += '<img class="worn-photo" src="' + esc(o.photo) + '" alt="" loading="lazy">';
+      else html += '<div class="pieces n' + imgs.length + '">' + imgs.filter(ours).map(function (src) { return '<img src="' + esc(src) + '" alt="" loading="lazy">'; }).join('') + '</div>';
       html += '<div class="meta"><span class="label">' + esc(o.label || fmt(T.look, { n: i + 1 })) + '</span>';
       html += showResults ? '<span class="pct">' + pct + '%</span>' : '<span class="pick">' + esc(T.pick) + '</span>';
       html += '</div>';
